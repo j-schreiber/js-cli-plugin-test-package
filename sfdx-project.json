@@ -20,7 +20,5 @@
   "packageAliases": {
     "SF CLI Plugin Test Package": "0HoPl00000000ZVKAY"
   },
-  "sourceBehaviorOptions": [
-    "decomposeCustomLabelsBeta2"
-  ]
+  "sourceBehaviorOptions": ["decomposeCustomLabelsBeta2"]
 }
