@@ -5,8 +5,8 @@
       "default": true
     },
     {
-      "versionName": "0.1",
-      "versionNumber": "0.1.0.NEXT",
+      "versionName": "1.0",
+      "versionNumber": "1.0.0.NEXT",
       "path": "src/packaged",
       "default": false,
       "package": "SF CLI Plugin Test Package",
