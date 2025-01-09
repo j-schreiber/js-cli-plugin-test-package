@@ -1,5 +1,5 @@
 {
-  "name": "your-package-name",
+  "name": "js-cli-plugin-test-package",
   "scripts": {
     "test:lwc:unit": "sfdx-lwc-jest",
     "test:lwc:unit:watch": "sfdx-lwc-jest --watch",
@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/..."
+    "url": "git+https://github.com/j-schreiber/js-cli-plugin-test-package"
   },
   "author": "Jannis Schreiber",
   "devDependencies": {

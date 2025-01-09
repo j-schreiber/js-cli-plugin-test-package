@@ -5,37 +5,20 @@
       "default": true
     },
     {
-      "path": "src/packaged",
-      "package": "Your Package Name",
-      "definitionFile": "config/default-scratch-def.json",
-      "versionName": "Package Version Name",
+      "versionName": "0.1",
       "versionNumber": "0.1.0.NEXT",
+      "path": "src/packaged",
       "default": false,
-      "dependencies": [
-        {
-          "package": "First Dependency",
-          "versionNumber": "1.0.0.LATEST"
-        },
-        {
-          "package": "Second Dependency",
-          "versionNumber": "1.0.0.LATEST"
-        }
-      ]
-    },
-    {
-      "path": "src/unpackaged",
-      "default": false
+      "package": "SF CLI Plugin Test Package",
+      "definitionFile": "config/minimal-enterprise-def.json",
+      "versionDescription": "Some metadata that can be deprecated by installing various versions of this package"
     }
   ],
   "namespace": "",
   "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "61.0",
   "packageAliases": {
-    "Package Name": "0HoXXXXXXXXXXXXXXX",
-    "First Dependency": "0HoXXXXXXXXXXXXXXX",
-    "Second Dependency": "0HoXXXXXXXXXXXXXXX",
-    "First Dependency Package Version": "04tXXXXXXXXXXXXXXX",
-    "Second Dependency Package Version": "04tXXXXXXXXXXXXXXX"
+    "SF CLI Plugin Test Package": "0HoPl00000000ZVKAY"
   },
   "sourceBehaviorOptions": [
     "decomposeCustomLabelsBeta2"

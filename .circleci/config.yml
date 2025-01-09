@@ -2,217 +2,130 @@ version: 2.1
 
 orbs:
   jsc-sfdx: jsc/salesforce@2
-  slack: circleci/slack@4
 
 parameters:
   devhubUsername:
-    description: Production username for the DevHub org (production environment)
+    description: DevHub username for the DevHub org
     type: string
-    default: admin-salesforce@mobilityhouse.com
+    default: business@lietzau-consulting.de
   devhubInstanceUrl:
-    description: Production instance URL
+    description: DevHub instance URL
     type: string
-    default: https://mobilityhouse.my.salesforce.com
-  devSandboxUsername:
-    description: Username for the Dev Sandbox (developer integration)
-    type: string
-    default: admin-salesforce@mobilityhouse.com.dev
-  qaSandboxUsername:
-    description: Username for the QA sandbox (UAT environment)
-    type: string
-    default: admin-salesforce@mobilityhouse.com.staging
+    default: https://jsc.my.salesforce.com
 
-commands:
-  slack_notify_deployment_started:
+jobs:
+  uat_beta_package_install:
+    description: >
+      Installs a beta package build on an integration scratch org for UAT
+    docker:
+      - image: cimg/openjdk:17.0-node
     parameters:
-      targetOrgName:
+      setupScript:
         type: string
+        default: scripts/shell/setup-uat.sh
+      scratchOrgAlias:
+        type: string
+        default: UatScratch
     steps:
-      - slack/notify:
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "$CIRCLE_JOB started",
-                    "emoji": true
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Target Org*: << parameters.targetOrgName >>"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Project*: $CIRCLE_PROJECT_REPONAME"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Branch*: $CIRCLE_BRANCH"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Author*: $CIRCLE_USERNAME"
-                    }
-                  ]
-                },
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "action_id": "basic_start_view",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "View Job"
-                      },
-                      "url": "${CIRCLE_BUILD_URL}"
-                    }
-                  ]
-                }
-              ]
-            }
-          event: always
+      - checkout
+      - jsc-sfdx/install
+      - jsc-sfdx/auth:
+          consumerKey: SFDX_CONSUMER_KEY
+          instanceUrl: << pipeline.parameters.devhubInstanceUrl >>
+          jwtKey: SFDX_JWT_KEY
+          setDefault: true
+          username: << pipeline.parameters.devhubUsername >>
+      - run:
+          command: >
+            source << parameters.setupScript >> -a << parameters.scratchOrgAlias >> -v << pipeline.parameters.devhubUsername >>
+          name: "Prepare Default UAT Scratch Org: << parameters.scratchOrgAlias >>"
+      - run:
+          command: >
+            sf org open -r -o << parameters.scratchOrgAlias >>
+          name: "Generate login link for: << parameters.scratchOrgAlias >>"
+      - jsc-sfdx/package-install:
+          installLatestBuild: true
+          devhubUsername: << pipeline.parameters.devhubUsername >>
+          targetOrg: << parameters.scratchOrgAlias >>
+      - run:
+          name: Run all tests in org
+          command: |
+            set +e
+            sf apex run test --target-org << parameters.scratchOrgAlias >> --wait 10 --test-level RunAllTestsInOrg --code-coverage --result-format junit --output-dir test-results/apex
+            exitCode=$?
+            rm -f test-results/apex/test-result.xml
+            rm -f test-results/apex/*.json
+            rm -f test-results/apex/*.txt
+            exit $exitCode
+      - store_test_results:
+          path: test-results
+  promote_latest_release_candidate:
+    description: >
+      Promotes the latest package version that was created during the build_release_candidate_version job
+    docker:
+      - image: cimg/openjdk:17.0-node
+    steps:
+      - checkout
+      - jsc-sfdx/install
+      - jsc-sfdx/auth:
+          consumerKey: SFDX_CONSUMER_KEY
+          instanceUrl: << pipeline.parameters.devhubInstanceUrl >>
+          jwtKey: SFDX_JWT_KEY
+          setDefault: true
+          username: << pipeline.parameters.devhubUsername >>
+      - jsc-sfdx/package-promote:
+          devhubUsername: << pipeline.parameters.devhubUsername >>
 
 workflows:
   package_build:
     jobs:
       - jsc-sfdx/scratch_org_test:
-          name: "standard_scratch_org_test"
-          additionalSteps:
-            - slack_notify_deployment_started:
-                targetOrgName: "Scratch Org"
+          name: minimal_enterprise_scratch_def
           devhubUsername: << pipeline.parameters.devhubUsername >>
           devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
           jwtKey: SFDX_JWT_KEY
           consumerKey: SFDX_CONSUMER_KEY
-          setupScript: scripts/shell/setup-eu.sh
+          setupScript: scripts/shell/setup.sh
           runPrettier: true
           runLwcTests: false
           context:
-            - salesforce
-            - salesforce_package_installation_keys
-      - jsc-sfdx/scratch_org_test:
-          name: "na_scratch_org_test"
-          additionalSteps:
-            - slack_notify_deployment_started:
-                targetOrgName: "NA Scratch Org"
-          devhubUsername: << pipeline.parameters.devhubUsername >>
-          devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
-          jwtKey: SFDX_JWT_KEY
-          consumerKey: SFDX_CONSUMER_KEY
-          setupScript: scripts/shell/setup-na.sh
-          runPrettier: false
-          runLwcTests: false
-          context:
-            - salesforce
-            - salesforce_package_installation_keys
-          filters:
-            branches:
-              only:
-                - /^version/.*/
+            - salesforce-partner-org
       - jsc-sfdx/build_release_candidate_version:
           devhubUsername: << pipeline.parameters.devhubUsername >>
           devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
           jwtKey: SFDX_JWT_KEY
           consumerKey: SFDX_CONSUMER_KEY
           package: PACKAGE_ID
+          requireInstallationKey: false
           context:
-            - salesforce
+            - salesforce-partner-org
           filters:
             branches:
               only:
                 - /^version/.*/
-      - jsc-sfdx/beta_package_deploy:
-          name: "dev_sandbox_deploy"
-          additionalSteps:
-            - slack_notify_deployment_started:
-                targetOrgName: "Dev Sandbox"
-          post-steps:
-            - slack/notify:
-                event: fail
-                template: basic_fail_1
-            - slack/notify:
-                event: pass
-                template: basic_success_1
-          devhubUsername: << pipeline.parameters.devhubUsername >>
-          targetOrgUsername: << pipeline.parameters.devSandboxUsername >>
-          devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
-          devhubJwtKey: SFDX_JWT_KEY
-          targetOrgJwtKey: SFDX_JWT_KEY
-          devhubConsumerKey: SFDX_CONSUMER_KEY
-          targetOrgConsumerKey: SFDX_CONSUMER_KEY_DEV
-          package: PACKAGE_ID
+      - uat_beta_package_install:
           requires:
-            - standard_scratch_org_test
-            - na_scratch_org_test
-          context:
-            - salesforce
-          filters:
-            branches:
-              only:
-                - /^version/.*/
-      - approve_qa:
-          type: approval
-          requires:
-            - dev_sandbox_deploy
-          filters:
-            branches:
-              only:
-                - /^version/.*/
-      - jsc-sfdx/beta_package_deploy:
-          name: "qa_sandbox_deploy"
-          additionalSteps:
-            - slack_notify_deployment_started:
-                targetOrgName: "QA Sandbox"
-          post-steps:
-            - slack/notify:
-                event: fail
-                template: basic_fail_1
-            - slack/notify:
-                event: pass
-                template: basic_success_1
-          devhubUsername: << pipeline.parameters.devhubUsername >>
-          targetOrgUsername: << pipeline.parameters.qaSandboxUsername >>
-          devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
-          devhubJwtKey: SFDX_JWT_KEY
-          targetOrgJwtKey: SFDX_JWT_KEY
-          devhubConsumerKey: SFDX_CONSUMER_KEY
-          targetOrgConsumerKey: SFDX_CONSUMER_KEY_STAGING
-          package: PACKAGE_ID
-          requires:
-            - approve_qa
-          context:
-            - salesforce
-          filters:
-            branches:
-              only:
-                - /^version/.*/
-      - approve_production:
-          type: approval
-          requires:
-            - qa_sandbox_deploy
+            - minimal_enterprise_scratch_def
             - jsc-sfdx/build_release_candidate_version
+          context:
+            - salesforce-partner-org
           filters:
             branches:
               only:
                 - /^version/.*/
-      - jsc-sfdx/promote_latest_package_build:
-          name: promote_release_candidate
-          devhubUsername: << pipeline.parameters.devhubUsername >>
-          devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
-          devhubJwtKey: SFDX_JWT_KEY
-          devhubConsumerKey: SFDX_CONSUMER_KEY
-          packageId: PACKAGE_ID
-          context:
-            - salesforce
+      - approve_package_release:
+          type: approval
           requires:
-            - approve_production
+            - uat_beta_package_install
+          filters:
+            branches:
+              only:
+                - /^version/.*/
+      - promote_latest_release_candidate:
+          requires:
+            - approve_package_release
+          context:
+            - salesforce-partner-org
           filters:
             branches:
               only:
