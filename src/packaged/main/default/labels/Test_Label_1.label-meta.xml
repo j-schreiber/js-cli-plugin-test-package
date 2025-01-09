@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomLabel>
+    <fullName>Test_Label_1</fullName>
+    <categories>ui,button,label</categories>
+    <language>en_US</language>
+    <protected>false</protected>
+    <shortDescription>Test label 1 from sf cli testing package</shortDescription>
+    <value>Test 1</value>
+</CustomLabel>
