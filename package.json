@@ -1,0 +1,26 @@
+{
+  "name": "your-package-name",
+  "scripts": {
+    "test:lwc:unit": "sfdx-lwc-jest",
+    "test:lwc:unit:watch": "sfdx-lwc-jest --watch",
+    "test:lwc:unit:debug": "sfdx-lwc-jest --debug",
+    "test:lwc:unit:ci": "sfdx-lwc-jest -- --reporters=jest-junit",
+    "prettier:check:ci": "./node_modules/.bin/prettier --check .",
+    "prettier:format": "./node_modules/.bin/prettier --write .",
+    "prettier:format:apex": "./node_modules/.bin/prettier --write '**/*.{trigger,cls,apex}'",
+    "prettier:format:json": "./node_modules/.bin/prettier --write '**/*.{json,yml,yaml}'",
+    "prettier:format:visualforce": "./node_modules/.bin/prettier --write '**/*.{cmp,page,component}'",
+    "prettier:format:lwc": "./node_modules/.bin/prettier --write '**/lwc/**/*.{html,js}'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/..."
+  },
+  "author": "Jannis Schreiber",
+  "devDependencies": {
+    "@salesforce/sfdx-lwc-jest": "^5.1.0",
+    "jest-junit": "^16.0.0",
+    "prettier": "^3.3.3",
+    "prettier-plugin-apex": "^2.1.4"
+  }
+}

@@ -1,0 +1,219 @@
+version: 2.1
+
+orbs:
+  jsc-sfdx: jsc/salesforce@2
+  slack: circleci/slack@4
+
+parameters:
+  devhubUsername:
+    description: Production username for the DevHub org (production environment)
+    type: string
+    default: admin-salesforce@mobilityhouse.com
+  devhubInstanceUrl:
+    description: Production instance URL
+    type: string
+    default: https://mobilityhouse.my.salesforce.com
+  devSandboxUsername:
+    description: Username for the Dev Sandbox (developer integration)
+    type: string
+    default: admin-salesforce@mobilityhouse.com.dev
+  qaSandboxUsername:
+    description: Username for the QA sandbox (UAT environment)
+    type: string
+    default: admin-salesforce@mobilityhouse.com.staging
+
+commands:
+  slack_notify_deployment_started:
+    parameters:
+      targetOrgName:
+        type: string
+    steps:
+      - slack/notify:
+          custom: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "$CIRCLE_JOB started",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Target Org*: << parameters.targetOrgName >>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Project*: $CIRCLE_PROJECT_REPONAME"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch*: $CIRCLE_BRANCH"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author*: $CIRCLE_USERNAME"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "action_id": "basic_start_view",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Job"
+                      },
+                      "url": "${CIRCLE_BUILD_URL}"
+                    }
+                  ]
+                }
+              ]
+            }
+          event: always
+
+workflows:
+  package_build:
+    jobs:
+      - jsc-sfdx/scratch_org_test:
+          name: "standard_scratch_org_test"
+          additionalSteps:
+            - slack_notify_deployment_started:
+                targetOrgName: "Scratch Org"
+          devhubUsername: << pipeline.parameters.devhubUsername >>
+          devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
+          jwtKey: SFDX_JWT_KEY
+          consumerKey: SFDX_CONSUMER_KEY
+          setupScript: scripts/shell/setup-eu.sh
+          runPrettier: true
+          runLwcTests: false
+          context:
+            - salesforce
+            - salesforce_package_installation_keys
+      - jsc-sfdx/scratch_org_test:
+          name: "na_scratch_org_test"
+          additionalSteps:
+            - slack_notify_deployment_started:
+                targetOrgName: "NA Scratch Org"
+          devhubUsername: << pipeline.parameters.devhubUsername >>
+          devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
+          jwtKey: SFDX_JWT_KEY
+          consumerKey: SFDX_CONSUMER_KEY
+          setupScript: scripts/shell/setup-na.sh
+          runPrettier: false
+          runLwcTests: false
+          context:
+            - salesforce
+            - salesforce_package_installation_keys
+          filters:
+            branches:
+              only:
+                - /^version/.*/
+      - jsc-sfdx/build_release_candidate_version:
+          devhubUsername: << pipeline.parameters.devhubUsername >>
+          devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
+          jwtKey: SFDX_JWT_KEY
+          consumerKey: SFDX_CONSUMER_KEY
+          package: PACKAGE_ID
+          context:
+            - salesforce
+          filters:
+            branches:
+              only:
+                - /^version/.*/
+      - jsc-sfdx/beta_package_deploy:
+          name: "dev_sandbox_deploy"
+          additionalSteps:
+            - slack_notify_deployment_started:
+                targetOrgName: "Dev Sandbox"
+          post-steps:
+            - slack/notify:
+                event: fail
+                template: basic_fail_1
+            - slack/notify:
+                event: pass
+                template: basic_success_1
+          devhubUsername: << pipeline.parameters.devhubUsername >>
+          targetOrgUsername: << pipeline.parameters.devSandboxUsername >>
+          devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
+          devhubJwtKey: SFDX_JWT_KEY
+          targetOrgJwtKey: SFDX_JWT_KEY
+          devhubConsumerKey: SFDX_CONSUMER_KEY
+          targetOrgConsumerKey: SFDX_CONSUMER_KEY_DEV
+          package: PACKAGE_ID
+          requires:
+            - standard_scratch_org_test
+            - na_scratch_org_test
+          context:
+            - salesforce
+          filters:
+            branches:
+              only:
+                - /^version/.*/
+      - approve_qa:
+          type: approval
+          requires:
+            - dev_sandbox_deploy
+          filters:
+            branches:
+              only:
+                - /^version/.*/
+      - jsc-sfdx/beta_package_deploy:
+          name: "qa_sandbox_deploy"
+          additionalSteps:
+            - slack_notify_deployment_started:
+                targetOrgName: "QA Sandbox"
+          post-steps:
+            - slack/notify:
+                event: fail
+                template: basic_fail_1
+            - slack/notify:
+                event: pass
+                template: basic_success_1
+          devhubUsername: << pipeline.parameters.devhubUsername >>
+          targetOrgUsername: << pipeline.parameters.qaSandboxUsername >>
+          devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
+          devhubJwtKey: SFDX_JWT_KEY
+          targetOrgJwtKey: SFDX_JWT_KEY
+          devhubConsumerKey: SFDX_CONSUMER_KEY
+          targetOrgConsumerKey: SFDX_CONSUMER_KEY_STAGING
+          package: PACKAGE_ID
+          requires:
+            - approve_qa
+          context:
+            - salesforce
+          filters:
+            branches:
+              only:
+                - /^version/.*/
+      - approve_production:
+          type: approval
+          requires:
+            - qa_sandbox_deploy
+            - jsc-sfdx/build_release_candidate_version
+          filters:
+            branches:
+              only:
+                - /^version/.*/
+      - jsc-sfdx/promote_latest_package_build:
+          name: promote_release_candidate
+          devhubUsername: << pipeline.parameters.devhubUsername >>
+          devhubInstanceUrl: << pipeline.parameters.devhubInstanceUrl >>
+          devhubJwtKey: SFDX_JWT_KEY
+          devhubConsumerKey: SFDX_CONSUMER_KEY
+          packageId: PACKAGE_ID
+          context:
+            - salesforce
+          requires:
+            - approve_production
+          filters:
+            branches:
+              only:
+                - /^version/.*/
