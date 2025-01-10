@@ -30,6 +30,9 @@ fi
 echo "sf project deploy start -o $alias"
 sf project deploy start -o "$alias"
 
+echo "sf org assign permset -n Test_Package_Full_Access -o $alias"
+sf org assign permset -n Test_Package_Full_Access -o "$alias"
+
 echo "sf data tree import -p data/plans/standard-plan.json -o $alias"
 sf data tree import -p data/plans/standard-plan.json -o "$alias"
 

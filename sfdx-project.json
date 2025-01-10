@@ -11,7 +11,7 @@
       "default": false,
       "package": "SF CLI Plugin Test Package",
       "definitionFile": "config/minimal-enterprise-def.json",
-      "versionDescription": "Some metadata that can be deprecated by installing various versions of this package"
+      "versionDescription": "Example metadata that can be deprecated by installing different versions of this package on your target org."
     }
   ],
   "namespace": "",
