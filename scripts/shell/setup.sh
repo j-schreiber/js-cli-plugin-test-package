@@ -36,5 +36,8 @@ sf org assign permset -n Test_Package_Full_Access -o "$alias"
 echo "sf data tree import -p data/plans/standard-plan.json -o $alias"
 sf data tree import -p data/plans/standard-plan.json -o "$alias"
 
+echo "run sf project deploy start -o $alias --ignore-conflicts to fix GlobalValueSet problems"
+sf project deploy start -o "$alias" --ignore-conflicts
+
 echo "sf org open -o $alias"
 sf org open -o "$alias"
