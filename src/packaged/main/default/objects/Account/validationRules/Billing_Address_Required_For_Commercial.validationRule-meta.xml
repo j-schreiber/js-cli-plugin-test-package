@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Billing_Address_Required_For_Commercial</fullName>
+    <active>true</active>
+    <description>Testing validation rule that makes billing address required, if customer is &quot;Commercial&quot;</description>
+    <errorConditionFormula>AND(
+  ISPICKVAL( CustomerType__c, &apos;Commercial&apos;),
+  OR(
+    ISBLANK( BillingCity ),
+    ISBLANK( BillingStreet )
+  )
+)</errorConditionFormula>
+    <errorDisplayField>CustomerType__c</errorDisplayField>
+    <errorMessage>When selected &quot;Commercial&quot; billing address must be completed</errorMessage>
+</ValidationRule>
